@@ -15,20 +15,14 @@ class Settings:
     PORT: int = int(os.getenv("PORT", 8000))
     CORS_ORIGIN: str = os.getenv("CORS_ORIGIN", "*")
 
-    # Groq LLM
-    GROQ_API_KEY1: str = os.getenv("GROQ_API_KEY1", "")
-    GROQ_API_KEY2: str = os.getenv("GROQ_API_KEY2", "")
-    GROQ_API_KEY3: str = os.getenv("GROQ_API_KEY3", "")
-    GROQ_API_KEY4: str = os.getenv("GROQ_API_KEY4", "")
-    GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+    # Amazon Bedrock — Nova 2 Lite
+    NOVA_MODEL_ID: str = os.getenv("NOVA_MODEL_ID", "amazon.nova-lite-v1:0")
+    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
     LLM_GENERATOR_MAX_TOKENS: int = int(os.getenv("LLM_GENERATOR_MAX_TOKENS", "4096"))
     LLM_GENERATOR_TEMPERATURE: float = float(os.getenv("LLM_GENERATOR_TEMPERATURE", "0.01"))
 
-    # AWS (for S3, DynamoDB, Lambda — not Bedrock)
-    AWS_REGION: str = os.getenv("AWS_REGION", "ap-south-1")
-    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-    S3_BUCKET: str = os.getenv("S3_BUCKET", "mentorbocai-videos")
+    # AWS (S3, DynamoDB — credentials via IAM role on EC2, no keys needed)
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "mentorbocai-nova-videos")
 
     # Storage
     BASE_DIR: str = os.getenv("BASE_DIR", "")

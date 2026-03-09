@@ -44,7 +44,7 @@ if sys.platform == 'win32':
 load_dotenv()
 
 # Amazon Bedrock Nova 2 Lite client
-from src.app.services.bedrock_client import call_bedrock as call_groq
+from src.app.services.bedrock_client import call_bedrock as call_nova
 
 def call_generator(prompt: str, expect_json: bool = True, system_prompt: str = None) -> str:
     """
@@ -57,8 +57,8 @@ def call_generator(prompt: str, expect_json: bool = True, system_prompt: str = N
     )
     max_tokens = int(os.getenv("LLM_GENERATOR_MAX_TOKENS", "8000"))
     temperature = float(os.getenv("LLM_GENERATOR_TEMPERATURE", "0.01"))
-    content = call_groq(prompt, system_prompt=sys_prompt, max_tokens=max_tokens, temperature=temperature)
-    print(f"[DEBUG] Groq LLM Response (first 500 chars): {str(content)[:500] if content else 'EMPTY'}")
+    content = call_nova(prompt, system_prompt=sys_prompt, max_tokens=max_tokens, temperature=temperature)
+    print(f"[DEBUG] Nova 2 Lite Response (first 500 chars): {str(content)[:500] if content else 'EMPTY'}")
     return content
 
 
@@ -122,7 +122,7 @@ def safe_json_loads(text: str) -> dict:
     if not text:
         return {}
 
-    # Detect HTTP error responses from groq_client before attempting JSON parse
+    # Detect HTTP error responses from bedrock_client before attempting JSON parse
     stripped = text.strip()
     if stripped.startswith("HTTP 4") or stripped.startswith("HTTP 5"):
         raise RuntimeError(f"LLM API error: {stripped[:200]}")
@@ -266,7 +266,7 @@ def layer4_generate_code(plan: dict, concept: str, goal: str = "") -> str:
         few_shot=few_shot_truncated
     )
 
-    print(f"[Layer 4] Generating with Groq LLM (few-shot)...")
+    print(f"[Layer 4] Generating with Amazon Nova 2 Lite (few-shot)...")
     result = call_generator(prompt, expect_json=False, system_prompt=CODEGEN_SYSTEM_PROMPT)
 
     # Extract code from markdown if present
@@ -362,7 +362,7 @@ def layer5_refine_code(code: str) -> str:
 def validate_and_fix_code(code: str, max_attempts: int = 3, concept: str = "") -> tuple:
     """
     Industry-grade validation pipeline with automatic fix loop.
-    Uses AST-based static validation + runtime smoke test + Groq reviewer for fixes.
+    Uses AST-based static validation + runtime smoke test + Nova reviewer for fixes.
     """
     try:
         from .validator import auto_fix_common_issues, static_validate, runtime_smoke_test

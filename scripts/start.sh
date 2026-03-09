@@ -14,8 +14,8 @@ else
     exit 1
 fi
 
-# Ping Groq keys before starting
-echo "🔑 Validating Groq API keys..."
+# Ping Bedrock (Nova 2 Lite) before starting
+echo "🔑 Validating Amazon Bedrock connectivity..."
 python bedrock_ping_test.py
 
 # Start FastAPI

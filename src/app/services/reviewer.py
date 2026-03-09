@@ -1,12 +1,12 @@
 """
 MentorBoxAI - Automated Code Reviewer/Fixer
-Uses Groq LLM (llama-3.3-70b-versatile) to automatically fix validation errors
-in generated Manim code. Replaces OpenAI/OpenRouter dependency from root version.
+Uses Amazon Nova 2 Lite (Bedrock) to automatically fix validation errors
+in generated Manim code.
 """
 
 import re
 from typing import Optional
-from src.app.services.bedrock_client import call_bedrock as call_groq
+from src.app.services.bedrock_client import call_bedrock as call_nova
 
 
 # Specialized prompt for code fixing - very strict, code-only output
@@ -97,7 +97,7 @@ def review_and_fix(source: str, error_message: str) -> Optional[str]:
     prompt = REVIEWER_USER_TEMPLATE.replace("{code}", source).replace("{error}", error_message)
 
     try:
-        result = call_groq(
+        result = call_nova(
             prompt=prompt,
             system_prompt=REVIEWER_SYSTEM_PROMPT,
             max_tokens=4000,
@@ -138,13 +138,13 @@ def review_and_fix(source: str, error_message: str) -> Optional[str]:
         return result.strip()
 
     except Exception as e:
-        print(f"[Reviewer] Error calling Groq LLM: {e}")
+        print(f"[Reviewer] Error calling Nova 2 Lite: {e}")
         return None
 
 
 def enhance_code_quality(source: str) -> str:
     """
-    Use Groq LLM to enhance code quality without fixing specific errors.
+    Use Nova 2 Lite to enhance code quality without fixing specific errors.
     Improves: positioning, comments, structure, educational content.
 
     Args:
@@ -171,7 +171,7 @@ IMPROVEMENTS TO MAKE:
 OUTPUT: Only the improved Python code. Keep the same structure and intent."""
 
     try:
-        result = call_groq(
+        result = call_nova(
             prompt=enhance_prompt,
             system_prompt="You are a Python code improver. Output ONLY valid Python code.",
             max_tokens=4000,

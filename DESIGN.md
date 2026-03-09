@@ -1,11 +1,10 @@
-
-# MentorBoxAI: Design Document
+# MentorBoxAI Nova: Design Document
 
 ---
 
 ## 🎯 Purpose & Vision
 
-MentorBoxAI is an AI-powered backend for generating cinematic educational videos using a 6-layer pipeline, **Groq LLM** (llama-3.3-70b-versatile), and Manim CE. The system is modular, robust, and optimized for hackathon and production use on AWS.
+MentorBoxAI Nova is an AI-powered backend for generating cinematic educational videos using a 6-layer pipeline, **Amazon Nova 2 Lite** (via AWS Bedrock), and Manim CE. The system is built for the Amazon Nova AI Hackathon 2026 under the Multimodal Understanding category.
 
 ---
 
@@ -18,35 +17,36 @@ MentorBoxAI is an AI-powered backend for generating cinematic educational videos
 | **3** | **Verification** | Validates the plan against technical requirements (No-LaTeX, Screen Bounds, Cognitive Load) |
 | **4** | **Code Generation** | Translates the storyboard into Manim Python code using Few-Shot Template logic |
 | **5** | **Refinement** | Injects high-end visual treatments (Glowing pulses, particle backgrounds, smooth transitions) |
-| **6** | **Validation & Fix** | Performs Static AST checking and a Runtime Smoke Test. If it fails, Groq Reviewer auto-patches the code |
+| **6** | **Validation & Fix** | Performs Static AST checking and a Runtime Smoke Test. If it fails, Nova Reviewer auto-patches the code |
 
 ---
 
 ## 🏗️ Component Roles & Responsibilities
 
-- **src/app/services/groq_client.py**: Groq API client with automatic key rotation across GROQ_API_KEY1/2/3. Retries on 401/403/429.
-- **src/app/services/pipeline.py**: Main orchestrator for all 6 pipeline layers, manages job flow, integrates LLM calls, validation, and rendering.
-- **src/app/services/prompts.py**: Full prompt engineering templates for all 5 layers + CODEGEN_SYSTEM_PROMPT + VALIDATION_PROMPT. No placeholders.
+- **src/app/services/bedrock_client.py**: Amazon Bedrock client using `boto3 converse()` API. IAM role authentication — no API keys. Throttle retry with 30s backoff.
+- **src/app/services/pipeline.py**: Main orchestrator for all 6 pipeline layers, manages job flow, integrates Nova LLM calls, validation, and rendering.
+- **src/app/services/prompts.py**: Full prompt engineering templates for all 5 layers + CODEGEN_SYSTEM_PROMPT + VALIDATION_PROMPT.
 - **src/app/services/few_shot_examples.py**: 7 golden few-shot examples (Vaccine, Respiration, Fusion, SHM, Mitosis, Quadratic, Epic Biology) with topic-routing function.
 - **src/app/services/validator.py**: AST-based static analysis, HALLUCINATED_ANIMATIONS auto-fix, runtime smoke test, visual quality scoring.
-- **src/app/services/reviewer.py**: Groq-powered code fixer — given an error message, returns corrected Manim code.
+- **src/app/services/reviewer.py**: Nova 2 Lite-powered code fixer — given an error message, returns corrected Manim code.
 - **src/app/api/v1/endpoints.py**: FastAPI endpoints: POST /api/generate, GET /api/status/{job_id}, GET /health.
 - **src/app/models/job.py**: Pydantic models (GenerateRequest, JobResponse, StatusResponse).
-- **src/app/core/config.py**: Settings class — Groq keys, AWS region (ap-south-1), LLM params, CORS.
-- **bedrock_ping_test.py**: Connectivity test — pings all 3 Groq keys + S3 + DynamoDB + Lambda + STS.
-- **scripts/start.sh**: Validates Groq keys before starting uvicorn server.
+- **src/app/core/config.py**: Settings class — Nova model ID, AWS region (us-east-1), LLM params, CORS.
+- **bedrock_ping_test.py**: Connectivity test — invokes Nova 2 Lite via Bedrock to verify IAM role and region are correct.
+- **scripts/start.sh**: Runs Bedrock ping test before starting uvicorn server.
 - **scripts/deploy_aws.sh**: Builds Docker image, pushes to ECR, updates ECS service.
 
 ---
 
 ## 🔑 LLM Configuration
 
-- **Provider**: Groq (https://api.groq.com/openai/v1/chat/completions)
-- **Model**: llama-3.3-70b-versatile
-- **Key rotation**: GROQ_API_KEY1 → GROQ_API_KEY2 → GROQ_API_KEY3 (auto-retry on failure)
-- **AWS Bedrock**: NOT used (blocked on AISPL accounts without international credit card)
-- **AWS services used**: S3 (video storage), DynamoDB (job persistence), Lambda (async triggers)
-- **Region**: ap-south-1 (Mumbai)
+- **Provider**: Amazon Bedrock (`bedrock-runtime`, us-east-1)
+- **Model**: `amazon.nova-lite-v1:0` (Nova 2 Lite)
+- **Authentication**: EC2 IAM Instance Profile — zero API key management
+- **API**: `boto3 client.converse()` — native AWS Messages API
+- **Fallback**: 1 retry on ThrottlingException with 30s backoff
+- **AWS services used**: Bedrock (LLM), EC2 (hosting + rendering), S3 (video storage, planned)
+- **Region**: us-east-1 (N. Virginia) — Nova 2 Lite available here
 
 ---
 
@@ -55,29 +55,31 @@ MentorBoxAI is an AI-powered backend for generating cinematic educational videos
 - **Zero-LaTeX Architecture**: Custom ColorfulScene uses Unicode/Text rendering with advanced styling, making it crash-proof in cloud/local environments.
 - **Screen-Safe Layouts**: Text-wrapping caption engine and boundary-checking logic prevent overlapping UI elements.
 - **Procedural Visuals**: All visuals are built using Manim primitives for high-resolution scalability.
-- **Self-Healing Logic**: Layer 6 detects errors and invokes Groq Reviewer to auto-patch code before user sees it.
+- **Self-Healing Logic**: Layer 6 detects errors and invokes Nova Reviewer to auto-patch code before user sees it.
+- **No Credential Management**: IAM Instance Profile on EC2 grants Bedrock access automatically — no `.env` API keys needed.
 - **Information Density**: Each core scene contains 2-3 labeled objects, a transformation/process animation, a concept caption, and at least one exam-relevant fact.
 - **NEET/JEE Focused**: Prompts optimized for Indian competitive exam content with exam tips and key ratios.
 - **Developer-Friendly**: Modular, testable, and scalable backend structure for rapid extension and CI/CD.
 
 ---
 
-## 🏆 Hackathon Alignment & Acceptance Criteria
+## 🏆 Hackathon Alignment
 
-- Meets requirements for learning acceleration, reliability, clarity, and scalability.
+- **Competition**: Amazon Nova AI Hackathon 2026
+- **Category**: Multimodal Understanding — text prompt → visual educational video
+- **Required technology**: Amazon Nova 2 Lite (Bedrock) — core LLM for all pipeline layers
 - Self-healing pipeline ensures zero runtime crashes and rapid iteration.
 - Information-dense visuals and screen-safe layouts optimize learning outcomes.
-- See requirements.md for full acceptance criteria and technical requirements.
 
 ---
 
 ## 🔄 Workflow Summary
 
-1. User submits topic and parameters via dashboard or API.
-2. Backend processes through 6-layer pipeline, each layer adding structure, checks, and enhancements.
-3. Manim renders animation, video is previewed/downloaded.
-4. Validator and reviewer ensure crash-free output.
-
+1. User submits topic via dashboard or API.
+2. Nova 2 Lite processes through 6-layer pipeline, each layer adding structure, checks, and enhancements.
+3. Manim renders animation at 720p 30fps (optimized for EC2 render time).
+4. Validator and Nova reviewer ensure crash-free output.
+5. Video served via FastAPI static file endpoint.
 ---
 
 ## 📚 Further Reading
