@@ -271,32 +271,29 @@ class ColorfulScene(Scene):
         self.wait(duration)
 
     def show_title(self, text_str):
-        """Show a professional title - NEET/JEE academic style."""
-        # STRICT: Truncate to 25 chars MAX to prevent overflow
-        title_text = str(text_str)[:25]
-        
+        """Show a professional title - NEET/JEE academic style.
+        Auto-scales to fit; never hard-truncates.
+        """
+        title_text = str(text_str)
+
         title = Text(title_text, font_size=36, font="Arial", weight=BOLD)
-        title.set_color_by_gradient(Colors.CYAN, Colors.GOLD)  # More professional gradient
-        
-        # CRITICAL: Scale down aggressively if still too wide
-        if title.width > 10:
-            title.scale(10 / title.width)
-        
-        # Scale down if too wide
-        if title.width > 13:
-            title.scale(13 / title.width)
-        
+        title.set_color_by_gradient(Colors.CYAN, Colors.GOLD)
+
+        # Scale down to fit within screen width (13 units wide)
+        if title.width > 12.5:
+            title.scale(12.5 / title.width)
+
         title.to_edge(UP, buff=0.4)
-        
-        # Add decorative line - thinner, more elegant
-        line = Line(LEFT * min(5, title.width/2 + 0.3), RIGHT * min(5, title.width/2 + 0.3), color=Colors.GOLD)
+
+        line_hw = min(5.5, title.width / 2 + 0.3)
+        line = Line(LEFT * line_hw, RIGHT * line_hw, color=Colors.GOLD)
         line.set_stroke(width=2)
         line.next_to(title, DOWN, buff=0.15)
-        
+
         self.play(Write(title), GrowFromCenter(line), run_time=1)
         self.wait(0.3)
         title_group = VGroup(title, line)
-        self.title = title_group   # store so generated code can do FadeOut(self.title)
+        self.title = title_group
         return title_group
 
     def add_fun_pulse(self, mobject, color=Colors.HOT_PINK, scale_factor=1.15):

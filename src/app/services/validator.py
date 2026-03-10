@@ -335,6 +335,22 @@ def auto_fix_common_issues(source: str) -> str:
     # run_time as only/first arg: .animate.METHOD(run_time=N) or .animate.METHOD(run_time=N, x)
     fixed = re.sub(r'(\.animate\.\w+\()\s*run_time\s*=\s*[\d.]+\s*,?\s*', r'\1', fixed)
 
+    # 20. Replace color=BLACK with color=WHITE on Text/MathTex/Tex calls.
+    # Background is dark (#0f0f2e) — BLACK text is invisible.
+    def _fix_black_text(m):
+        fixes_applied.append("Replaced color=BLACK with color=WHITE on Text/MathTex")
+        return m.group(0).replace(m.group(1), 'WHITE')
+    fixed = re.sub(
+        r'(Text|MathTex|Tex)\([^)]*\bcolor\s*=\s*(BLACK|Colors\.BLACK|"#000000"|\'#000000\')[^)]*\)',
+        lambda m: m.group(0).replace(m.group(0)[m.group(0).find('color'):].split(',')[0].split(')')[0],
+                                     m.group(0)[m.group(0).find('color'):].split(',')[0].split(')')[0]
+                                     .replace(m.group(2), 'Colors.WHITE')),
+        fixed
+    )
+    # Simpler targeted replace for the most common patterns
+    fixed = re.sub(r'\bcolor\s*=\s*BLACK\b', 'color=Colors.WHITE', fixed)
+    fixed = re.sub(r'\bcolor\s*=\s*Colors\.BLACK\b', 'color=Colors.WHITE', fixed)
+
     if fixes_applied:
         print(f"[Validator] Auto-fixed {len(fixes_applied)} issues: {', '.join(fixes_applied)}")
     

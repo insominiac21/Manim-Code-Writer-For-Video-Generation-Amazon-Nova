@@ -17,8 +17,8 @@ Goal: "{goal}"
 CRITICAL RULES (READ FIRST!):
 ═══════════════════════════════════════════════════════════════════════════════
 
-1. TITLE MAX 25 CHARACTERS! Example: "How Vaccines Work" (17 chars)
-   NOT: "The Mechanism of How Vaccines Train Your Immune System"
+1. TITLE: Write the full title — do NOT shorten or truncate it. show_title() auto-scales.
+   Example: "Purity Through Distillation" is fine (full length, not "Purity Through Dist")
 
 2. The video MUST be information-dense - every second teaches something
 
@@ -61,12 +61,13 @@ ARTISTIC VISUAL REQUIREMENTS (THINK 3BLUE1BROWN QUALITY):
    - Virus = spiky circle with menacing red glow
    - Antibody = Y-shaped with lock-and-key animation
    - Energy = radiating golden waves
-4. COLOR WITH PURPOSE:
+4. COLOR WITH PURPOSE — background is DARK (#0f0f2e), NEVER use BLACK or dark colors for text/labels:
    - RED = danger, pathogen, warning
    - GREEN = healthy, growth, defense
    - GOLD = energy, success, key insight
    - CYAN = information, process, flow
    - PURPLE = transformation, mystery
+   - DEFAULT TEXT: always Colors.WHITE or a bright color — NEVER BLACK, NEVER omit color=
 5. LESS IS MORE - MAX 3 objects per scene
 
 Return JSON:
@@ -421,11 +422,9 @@ CRITICAL RULES - READ FIRST!
    ❌  DO NOT add extra self.wait() pads between scenes (waste of screen time).
    Bad example: plan says "MoveAlongPath electron", you write "self.wait(2)" instead — FORBIDDEN.
 
-1. TITLE MAX 25 CHARACTERS!
-   - GOOD: "Mendel's Laws" (13 chars)
-   - BAD: "How Mendel's Laws Explain Inheritance Patterns"
-
-   title_group = self.show_title("Mendel's Laws")  # MAX 25 chars!
+1. TITLE: Write the FULL title — show_title() auto-scales to fit. Never truncate.
+   - GOOD: self.show_title("How Mendel's Laws Explain Inheritance")
+   - BAD:  self.show_title("Mendel's Laws")  # don't shorten
 
 2. RESPECT DURATION FROM PLAN!
    - Add self.wait() to match planned scene durations
@@ -834,6 +833,11 @@ CRITICAL RULES - VIOLATION MEANS FAILURE:
 16. NEVER pass run_time= inside .animate.METHOD(). run_time belongs in self.play() only:
     WRONG: self.play(obj.animate.move_to(RIGHT*0.5, run_time=1))
     RIGHT: self.play(obj.animate.move_to(RIGHT*0.5), run_time=1)
+
+17. NEVER use BLACK or dark text colors. Background is dark (#0f0f2e). Always specify
+    a bright color= on every Text(), MathTex(), always pass color=Colors.WHITE (or brighter):
+    WRONG: Text("Heat")  or  Text("Heat", color=BLACK)
+    RIGHT: Text("Heat", font_size=24, color=Colors.WHITE)
 
 ═══════════════════════════════════════════════════════════════════════════════
 CINEMATIC MANDATE — YOU MUST USE THESE TECHNIQUES (not just circles + labels):
