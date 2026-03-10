@@ -3,6 +3,48 @@
    Fresh, modern, unique design
    ======================================== */
 
+/* Toast notifications */
+#toastContainer {
+  position: fixed;
+  top: 1.2rem;
+  right: 1.2rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  pointer-events: none;
+}
+.toast {
+  padding: 0.75rem 1.2rem;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  color: #fff;
+  max-width: 360px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  pointer-events: auto;
+  animation: toastIn .25s ease;
+}
+.toast.success { background: #0d9488; }
+.toast.error   { background: #dc2626; }
+.toast.info    { background: #2563eb; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Mixed-content / HTTPS warning banner */
+#httpsBanner {
+  display: none;
+  background: #7c3aed;
+  color: #fff;
+  padding: 0.7rem 1.2rem;
+  font-size: 0.88rem;
+  text-align: center;
+  line-height: 1.5;
+}
+#httpsBanner a { color: #fbbf24; font-weight: 600; }
+
 :root {
   /* Teal/Emerald Color Palette */
   --primary: #0d9488;

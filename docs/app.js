@@ -64,6 +64,7 @@ videoModal.addEventListener('click', (e) => {
 
 // Initialize - Load saved jobs from localStorage
 document.addEventListener('DOMContentLoaded', () => {
+    checkMixedContent();
     loadJobsFromStorage();
     renderJobs();
     initPlanModal();
@@ -480,14 +481,31 @@ function escapeHtml(text) {
 }
 
 /**
- * Show notification toast
+ * Show notification toast (in-page — never uses alert so it works in Edge too)
  */
 function showNotification(message, type = 'info') {
-    // Simple alert for now - can be replaced with toast library
     console.log(`[${type.toUpperCase()}] ${message}`);
 
-    if (type === 'error') {
-        alert(message);
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+    toast.textContent = message;
+    container.appendChild(toast);
+
+    // Auto-remove after 5 s (errors stay a bit longer)
+    const delay = type === 'error' ? 7000 : 4000;
+    setTimeout(() => toast.remove(), delay);
+}
+
+/**
+ * Show mixed-content warning banner if on HTTPS but EC2 backend is HTTP
+ */
+function checkMixedContent() {
+    if (window.location.protocol === 'https:' && API_BASE.startsWith('http:')) {
+        const banner = document.getElementById('httpsBanner');
+        if (banner) banner.style.display = 'block';
     }
 }
 
