@@ -8,6 +8,56 @@ MentorBoxAI converts any topic into a 3Blue1Brown-style educational animation us
 
 ---
 
+## 🧑‍⚖️ Judge Evaluation Guide
+
+### Option 1: Live Dashboard (Recommended & Fastest)
+
+The easiest way to evaluate MentorBoxAI is via our live hosted AWS EC2 instance. No AWS credentials or local setup are required on your end.
+
+1. Navigate to: **http://3.215.177.47:8000/**
+2. You will see the MentorBoxAI Dashboard.
+3. **Test Prompt:** In the concept field, type a topic like: `"Simple Harmonic Motion"`, `"DNA Replication"`, or `"Bohr's Atomic Model"`.
+4. Select a complexity level (e.g., "JEE Advanced" or "Class 10").
+5. Click **"Generate Video"**.
+
+**What to watch for:** You will see our 6-layer pipeline progress in real-time. The entire process (Understanding → Storyboarding → Code Gen → Validation → Manim Rendering) will take approximately 2–3 minutes. Once it hits 100%, the 720p MP4 will play directly in your browser.
+
+---
+
+### Option 2: Direct API Testing
+
+If you prefer to test the FastAPI backend directly, you can use the following curl commands against our live server:
+
+**1. Initiate a Generation Job:**
+```bash
+curl -X POST http://3.215.177.47:8000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"concept":"DNA Replication", "auto_render":true}'
+```
+*(This will return a `job_id`)*
+
+**2. Poll for Status:**
+```bash
+curl http://3.215.177.47:8000/api/status/<INSERT_JOB_ID_HERE>
+```
+
+---
+
+### Option 3: Local Setup (Linux / WSL Only)
+
+If you wish to run the architecture locally to inspect the code generation:
+
+> **Requirement:** You MUST be on Linux or WSL. Manim will crash on standard Windows due to missing Cairo/Pango/FFmpeg libraries.
+
+1. Clone the repo and run `pip install -r requirements.txt`.
+2. Rename `.env.example` to `.env`. Ensure your local AWS CLI is configured with credentials that have `AmazonBedrockFullAccess` in `us-east-1` (specifically, model access for `amazon.nova-pro-v1:0` must be requested/enabled in your AWS console).
+3. Run: `venv/bin/uvicorn src.app.main:app --host 0.0.0.0 --port 8000`
+
+> 🔍 **Key Evaluation Point for Judges:**
+> If you run this locally and watch the terminal output during Layer 6 (Validation), you will likely see the AI initially write a small syntax error, followed immediately by our "Self-Healing" layer catching it, feeding the traceback to Nova Pro, and patching it autonomously before the Manim render starts. This is our core technical moat!
+
+---
+
 ## AWS Services
 
 | Service | How it's used |
