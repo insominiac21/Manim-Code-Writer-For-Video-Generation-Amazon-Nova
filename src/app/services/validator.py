@@ -486,7 +486,9 @@ sys.path.insert(0, '.')
 # Prevents ImportError when generated code does `from manim_templates import *`
 if 'manim_templates' not in sys.modules:
     _mock_mt = types.ModuleType('manim_templates')
-    class Colors:
+    class _ColorsMeta(type):
+        def __getattr__(cls, name): return "#FFFFFF"
+    class Colors(metaclass=_ColorsMeta):
         DARK_BG = "#0f0f2e"
         CYAN = "#00FFFF"; BLUE = "#0000FF"; RED = "#FF0000"
         HOT_PINK = "#FF69B4"; PINK = "#FF69B4"

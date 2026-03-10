@@ -86,7 +86,13 @@ import textwrap
 # ==========================================
 # COLOR PALETTE
 # ==========================================
-class Colors:
+class _ColorsFallbackMeta(type):
+    """Metaclass that returns WHITE for any unknown Colors.X attribute.
+    Prevents AttributeError when Nova invents color names like Colors.GLASS."""
+    def __getattr__(cls, name):
+        return "#FFFFFF"
+
+class Colors(metaclass=_ColorsFallbackMeta):
     DARK_BG = "#0f0f2e"  # Dark blue-purple background
     CYAN = "#00FFFF"
     HOT_PINK = "#FF69B4"
