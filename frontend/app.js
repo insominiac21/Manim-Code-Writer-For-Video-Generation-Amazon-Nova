@@ -279,6 +279,10 @@ async function pollJobStatus(jobId) {
         const jobIndex = jobs.findIndex(j => j.job_id === jobId);
         if (jobIndex !== -1) {
             jobs[jobIndex] = { ...jobs[jobIndex], ...data };
+            // Cache narrations (small strings, survive localStorage strip)
+            if (data.plan) {
+                jobs[jobIndex].narrations = extractNarrations(data.plan);
+            }
             saveJobsToStorage();
             renderJobs();
 
@@ -375,6 +379,23 @@ function renderJobs() {
 }
 
 /**
+ * Extract narrations from plan timeline (play_caption texts)
+ */
+function extractNarrations(plan) {
+    if (!plan || !plan.timeline) return [];
+    return plan.timeline.map(scene => {
+        const narration = (scene.actions || [])
+            .map(action => {
+                const m = action.match(/play_caption\(['"](.+?)['"]\)/);
+                return m ? m[1] : null;
+            })
+            .filter(Boolean)
+            .join(' ');
+        return { title: scene.name || `Scene ${scene.scene}`, narration };
+    }).filter(s => s.narration);
+}
+
+/**
  * Open video modal
  */
 function openVideo(jobId) {
@@ -385,6 +406,22 @@ function openVideo(jobId) {
     videoPlayer.src = fullUrl(job.video_url);
     downloadLink.href = fullUrl(job.video_url);
     downloadLink.download = `${job.concept.replace(/\s+/g, '_')}.mp4`;
+
+    // Populate speaker notes
+    const notesPanel = document.getElementById('speakerNotesPanel');
+    const notesList = document.getElementById('speakerNotesList');
+    const narrations = job.narrations || extractNarrations(job.plan);
+    if (narrations && narrations.length > 0) {
+        notesList.innerHTML = narrations.map(n =>
+            `<div class="note-item">
+                <span class="note-scene">${escapeHtml(n.title)}</span>
+                <span class="note-text">${escapeHtml(n.narration)}</span>
+            </div>`
+        ).join('');
+        notesPanel.style.display = 'block';
+    } else {
+        notesPanel.style.display = 'none';
+    }
 
     videoModal.classList.add('active');
 }
@@ -472,7 +509,7 @@ function saveJobsToStorage() {
         // Strip heavy fields (code, plans) to prevent localStorage size limits (4KB - 5MB)
         const simplifiedJobs = jobs.map(job => {
             const { manim_code, plan, understanding, ...essential } = job;
-            return essential;
+            return essential; // narrations stays in essential — small strings
         });
         localStorage.setItem('mentorbocai_jobs', JSON.stringify(simplifiedJobs));
     } catch (e) {
