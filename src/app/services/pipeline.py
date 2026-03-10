@@ -256,8 +256,8 @@ def layer4_generate_code(plan: dict, concept: str, goal: str = "") -> str:
 
     from .prompts import LAYER4_PROMPT, CODEGEN_SYSTEM_PROMPT
 
-    # Truncate few-shot to fit context window
-    few_shot_truncated = (few_shot[:3500] + "\n# [truncated]...") if few_shot and len(few_shot) > 3500 else (few_shot or "")
+    # Nova Pro has 300K context window — allow much larger few-shot examples
+    few_shot_truncated = (few_shot[:8000] + "\n# [truncated]...") if few_shot and len(few_shot) > 8000 else (few_shot or "")
 
     prompt = LAYER4_PROMPT.format(
         plan=json.dumps(plan, indent=2),

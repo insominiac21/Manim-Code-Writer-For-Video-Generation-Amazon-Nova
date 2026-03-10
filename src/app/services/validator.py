@@ -280,6 +280,20 @@ def auto_fix_common_issues(source: str) -> str:
         return f'n={m.group(1)}'
     fixed = re.sub(r'\bnum_sides\s*=\s*(\d+)', _fix_num_sides, fixed)
 
+    # 15. Fix range() with float args → np.arange()
+    # e.g. range(0.5, 1.5, 0.1) → np.arange(0.5, 1.5, 0.1)
+    # Python range() only accepts integers; np.arange() accepts floats.
+    def _fix_range_float(m):
+        args = m.group(1)
+        fixes_applied.append(f"Fixed range({args}) float args -> np.arange({args})")
+        return f'np.arange({args})'
+    # Match range(...) where any arg contains a decimal point
+    fixed = re.sub(
+        r'\brange\(([^)]*\.[^)]*)\)',
+        _fix_range_float,
+        fixed
+    )
+
     if fixes_applied:
         print(f"[Validator] Auto-fixed {len(fixes_applied)} issues: {', '.join(fixes_applied)}")
     

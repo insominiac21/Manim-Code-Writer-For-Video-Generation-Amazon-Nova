@@ -814,6 +814,15 @@ CRITICAL RULES - VIOLATION MEANS FAILURE:
 6. Class MUST be named GeneratedScene inheriting from ColorfulScene (from template)
 7. NO top-level code outside methods.
 8. USE self.play_caption("text") for ALL captions.
+9. range() ONLY takes integers. For float steps use np.arange():
+   WRONG: range(0.5, 1.5, 0.1)   → crashes with TypeError
+   RIGHT: np.arange(0.5, 1.5, 0.1)
+10. NEVER invent class names. Only use built-in Manim classes (Circle, Line, Arrow,
+    Rectangle, Square, Dot, Text, VGroup, etc.) and ColorfulScene methods listed below.
+    NEVER write: MountainPeak(), LineOfSight(), Observer(), Capillary() — these do not exist.
+11. LaggedStart takes *args (unpacked), NOT a list:
+    WRONG: LaggedStart([FadeIn(a), FadeIn(b)], lag_ratio=0.1)
+    RIGHT: LaggedStart(*[FadeIn(x) for x in items], lag_ratio=0.1)
 
 ═══════════════════════════════════════════════════════════════════════════════
 CINEMATIC MANDATE — YOU MUST USE THESE TECHNIQUES (not just circles + labels):
