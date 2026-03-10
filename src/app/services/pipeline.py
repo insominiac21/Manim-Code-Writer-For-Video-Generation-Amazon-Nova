@@ -772,28 +772,46 @@ def _strip_failing_element(code: str, stderr: str) -> str:
     return '\n'.join(lines)
 
 
+def _build_basic_fallback(concept: str) -> str:
+    """Minimal guaranteed-renderable scene — only Text + FadeIn, no fancy objects."""
+    safe = concept.replace('"', "'")[:50]
+    return f'''from manim import *
+class GeneratedScene(Scene):
+    def construct(self):
+        self.camera.background_color = "#0f0f2e"
+        title = Text("{safe}", font_size=36, color=YELLOW)
+        sub = Text("Animation could not be generated", font_size=22, color=WHITE).next_to(title, DOWN, buff=0.5)
+        self.play(FadeIn(title), FadeIn(sub))
+        self.wait(3)
+'''
+
+
 def render_video(job_id: str, manim_file: Path, concept: str = "", plan: Optional[dict] = None) -> Optional[str]:
     """
     Self-healing render pipeline. Delay is acceptable — failure is not.
 
-    Flow per attempt:
-      1. Try render (direct manim binary, then python -m manim)
-      2. On failure: extract exact error + line from Manim stderr
-      3. Apply auto_fix_common_issues (rule-based) + LLM reviewer (error-specific)
-      4. Write fixed file, retry — up to MAX_FIX_ATTEMPTS LLM rounds
-      5. Final pass: strip the crashing line surgically, try one last render
-      6. Return None only if stripped version also fails
+    Phase 1 — LLM fix loop (MAX_LLM_ATTEMPTS rounds):
+      Each round: render → extract error → auto_fix + LLM review → write fixed file → retry
+    Phase 2 — Strip loop (MAX_STRIP_ROUNDS rounds):
+      Each round: strip the crashing line → retry. Keeps going until it compiles.
+    Phase 3 — Basic fallback (absolute last resort):
+      Pure Text-only scene guaranteed to render. Only used if all phases above fail.
     """
-    MAX_FIX_ATTEMPTS = 3
+    MAX_LLM_ATTEMPTS = 3
+    MAX_STRIP_ROUNDS = 10
 
     print(f"[Render] Waiting for render slot: {job_id}...")
     with _RENDER_LOCK:
         print(f"[Render] Starting render for {job_id}...")
 
+        from src.app.services.validator import auto_fix_common_issues
+        from src.app.services.reviewer import review_and_fix
+
         current_file = manim_file
         last_stderr = ""
 
-        for attempt in range(MAX_FIX_ATTEMPTS + 1):
+        # ── Phase 1: LLM fix rounds ──────────────────────────────────────────
+        for attempt in range(MAX_LLM_ATTEMPTS):
             url, stderr = _try_render_direct(job_id, current_file)
             if url:
                 return url
@@ -804,54 +822,75 @@ def render_video(job_id: str, manim_file: Path, concept: str = "", plan: Optiona
                 return url
             last_stderr = last_stderr or stderr or ""
 
-            if attempt == MAX_FIX_ATTEMPTS:
-                break
-
             error_summary = _extract_render_error(last_stderr)
             if not error_summary:
-                print("[Render] Cannot parse error from stderr — stopping fix loop")
+                print("[Render] Cannot parse error — skipping to strip loop")
                 break
 
-            print(f"[Render] Fix attempt {attempt + 1}/{MAX_FIX_ATTEMPTS}: {error_summary[:150]}")
-
+            print(f"[Render] LLM fix {attempt + 1}/{MAX_LLM_ATTEMPTS}: {error_summary[:150]}")
             try:
-                from src.app.services.validator import auto_fix_common_issues
-                from src.app.services.reviewer import review_and_fix
-
                 code = current_file.read_text(encoding="utf-8")
-                code = auto_fix_common_issues(code)          # rule-based fast fixes
-                fixed_code = review_and_fix(code, error_summary)  # LLM targeted fix
+                code = auto_fix_common_issues(code)
+                fixed_code = review_and_fix(code, error_summary)
                 if not fixed_code:
-                    print("[Render] LLM returned no fix — stripping failing element")
+                    print("[Render] LLM returned no fix — will strip in next round")
                     fixed_code = _strip_failing_element(code, last_stderr)
             except Exception as fix_err:
-                print(f"[Render] Fix error: {fix_err}")
+                print(f"[Render] LLM fix error: {fix_err}")
                 break
 
             fix_file = manim_file.parent / f"{job_id}_fix{attempt + 1}.py"
             fix_file.write_text(fixed_code, encoding="utf-8")
             current_file = fix_file
 
-        # Final pass: strip the crashing line and try once more
-        print("[Render] LLM rounds exhausted — stripping failing element for final attempt")
+        # One more render attempt after all LLM rounds
+        url, stderr = _try_render_direct(job_id, current_file)
+        if url:
+            return url
+        last_stderr = stderr or last_stderr
+        url, stderr = _try_render_python_module(job_id, current_file)
+        if url:
+            return url
+        last_stderr = last_stderr or stderr or ""
+
+        # ── Phase 2: Strip loop — keep removing bad lines until it compiles ──
+        print(f"[Render] LLM rounds exhausted — entering strip loop (up to {MAX_STRIP_ROUNDS} rounds)")
+        code = current_file.read_text(encoding="utf-8")
+        for strip_round in range(MAX_STRIP_ROUNDS):
+            code = _strip_failing_element(code, last_stderr)
+            strip_file = manim_file.parent / f"{job_id}_strip{strip_round + 1}.py"
+            strip_file.write_text(code, encoding="utf-8")
+
+            print(f"[Render] Strip round {strip_round + 1}/{MAX_STRIP_ROUNDS}")
+            url, stderr = _try_render_direct(job_id, strip_file)
+            if url:
+                print(f"[Render] Compiled after {strip_round + 1} strip round(s)")
+                return url
+            last_stderr = stderr or last_stderr
+
+            url, stderr = _try_render_python_module(job_id, strip_file)
+            if url:
+                print(f"[Render] Compiled after {strip_round + 1} strip round(s)")
+                return url
+            last_stderr = last_stderr or stderr or ""
+
+        # ── Phase 3: Basic text-only fallback ────────────────────────────────
+        print("[Render] Strip loop exhausted — using basic text fallback (last resort)")
         try:
-            code = current_file.read_text(encoding="utf-8")
-            stripped_code = _strip_failing_element(code, last_stderr)
-            strip_file = manim_file.parent / f"{job_id}_stripped.py"
-            strip_file.write_text(stripped_code, encoding="utf-8")
+            fallback_code = _build_basic_fallback(concept)
+            fallback_file = manim_file.parent / f"{job_id}_fallback.py"
+            fallback_file.write_text(fallback_code, encoding="utf-8")
 
-            url, _ = _try_render_direct(job_id, strip_file)
+            url, _ = _try_render_direct(job_id, fallback_file)
             if url:
-                print("[Render] Stripped version rendered successfully")
                 return url
-            url, _ = _try_render_python_module(job_id, strip_file)
+            url, _ = _try_render_python_module(job_id, fallback_file)
             if url:
-                print("[Render] Stripped version rendered successfully")
                 return url
-        except Exception as strip_err:
-            print(f"[Render] Strip attempt error: {strip_err}")
+        except Exception as fb_err:
+            print(f"[Render] Basic fallback error: {fb_err}")
 
-        print("[Render] All render attempts failed.")
+        print("[Render] All phases failed.")
         return None
 
 

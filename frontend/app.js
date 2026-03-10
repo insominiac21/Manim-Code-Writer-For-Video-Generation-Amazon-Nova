@@ -6,7 +6,7 @@
 // Configuration — auto-detect backend URL
 // When served from GitHub Pages the backend is EC2; when served from EC2 itself use relative paths.
 const API_BASE = window.location.hostname === 'insominiac21.github.io'
-  ? 'http://13.126.103.26:8000'
+  ? 'http://3.215.177.47:8000'
   : '';
 
 /** Resolve a possibly-relative API path to an absolute URL. */
