@@ -271,7 +271,15 @@ def auto_fix_common_issues(source: str) -> str:
     # 13. (Removed) The blanket LEFT/RIGHT→DOWN override was incorrectly breaking
     # split-screen layouts where left_panel.next_to(right_panel, RIGHT) is intentional.
     # Layout enforcement is now handled by clamp_to_screen() in ColorfulScene.
-    
+
+    # 14. Fix `num_sides=N` kwarg — not valid for any Manim object.
+    # RegularPolygon uses `n=N`, Polygon takes positional vertex args.
+    # e.g. RegularPolygon(num_sides=6) → RegularPolygon(n=6)
+    def _fix_num_sides(m):
+        fixes_applied.append(f"Fixed num_sides={m.group(1)} -> n={m.group(1)}")
+        return f'n={m.group(1)}'
+    fixed = re.sub(r'\bnum_sides\s*=\s*(\d+)', _fix_num_sides, fixed)
+
     if fixes_applied:
         print(f"[Validator] Auto-fixed {len(fixes_applied)} issues: {', '.join(fixes_applied)}")
     
