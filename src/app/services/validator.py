@@ -294,6 +294,34 @@ def auto_fix_common_issues(source: str) -> str:
         fixed
     )
 
+    # 16. Fix GREY → GRAY (Manim uses GRAY, not GREY — GREY causes NameError)
+    if '\bGREY\b' or 'GREY' in fixed:
+        count_before = fixed.count('GREY')
+        fixed = re.sub(r'\bGREY\b', 'GRAY', fixed)
+        count_after = fixed.count('GREY')
+        if count_before != count_after:
+            fixes_applied.append(f"Fixed {count_before - count_after}x GREY -> GRAY")
+
+    # 17. Fix Create(obj.animate.method(args)) → obj.animate.method(args)
+    # Create() only accepts Mobjects. .animate returns an Animation chain — wrapping
+    # it in Create() causes: TypeError: expected Mobject, got _AnimationBuilder
+    def _fix_create_animate(m):
+        fixes_applied.append("Fixed Create(obj.animate...) -> obj.animate...")
+        return m.group(1)
+    fixed = re.sub(
+        r'\bCreate\((\w+(?:\[\w+\])?\s*\.animate\.\w+\([^()]*\))\)',
+        _fix_create_animate,
+        fixed
+    )
+
+    # 18. Fix LaggedStart([list]) → LaggedStart(*[list])
+    # LaggedStart takes *args (unpacked), not a list. LaggedStart([...]) silently
+    # animates the list as a single object instead of each element separately.
+    count_before = fixed.count('LaggedStart([')
+    fixed = fixed.replace('LaggedStart([', 'LaggedStart(*[')
+    if fixed.count('LaggedStart(*[') > count_before - fixed.count('LaggedStart(['):
+        fixes_applied.append(f"Fixed LaggedStart([...]) -> LaggedStart(*[...])")
+
     if fixes_applied:
         print(f"[Validator] Auto-fixed {len(fixes_applied)} issues: {', '.join(fixes_applied)}")
     

@@ -815,7 +815,7 @@ CRITICAL RULES - VIOLATION MEANS FAILURE:
 7. NO top-level code outside methods.
 8. USE self.play_caption("text") for ALL captions.
 9. range() ONLY takes integers. For float steps use np.arange():
-   WRONG: range(0.5, 1.5, 0.1)   → crashes with TypeError
+   WRONG: range(0.5, 1.5, 0.1)   → crashes with TypeError: float cannot be integer
    RIGHT: np.arange(0.5, 1.5, 0.1)
 10. NEVER invent class names. Only use built-in Manim classes (Circle, Line, Arrow,
     Rectangle, Square, Dot, Text, VGroup, etc.) and ColorfulScene methods listed below.
@@ -823,6 +823,14 @@ CRITICAL RULES - VIOLATION MEANS FAILURE:
 11. LaggedStart takes *args (unpacked), NOT a list:
     WRONG: LaggedStart([FadeIn(a), FadeIn(b)], lag_ratio=0.1)
     RIGHT: LaggedStart(*[FadeIn(x) for x in items], lag_ratio=0.1)
+12. GREY does not exist in Manim. Use GRAY:
+    WRONG: color=GREY    RIGHT: color=GRAY
+13. NEVER wrap .animate chains in Create(). Create() takes Mobjects only:
+    WRONG: Create(obj.animate.move_to(ORIGIN))  → TypeError: expected Mobject
+    RIGHT: obj.animate.move_to(ORIGIN)  (use directly inside self.play())
+14. stroke_width minimum is 1.5 for visible lines. stroke_width=0.1 is invisible.
+15. Use only standard Manim color names: WHITE, BLACK, RED, BLUE, GREEN, YELLOW,
+    ORANGE, PURPLE, PINK, TEAL, GOLD, GRAY — or Colors.X from the template class.
 
 ═══════════════════════════════════════════════════════════════════════════════
 CINEMATIC MANDATE — YOU MUST USE THESE TECHNIQUES (not just circles + labels):

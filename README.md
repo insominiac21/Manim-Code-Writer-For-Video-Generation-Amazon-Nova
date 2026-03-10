@@ -1,5 +1,240 @@
-
 # MentorBoxAI Nova: AI Educational Video Engine (Amazon Nova Edition)
+
+MentorBoxAI converts any topic into a 3Blue1Brown-style educational animation using a 6-layer AI pipeline powered by **Amazon Nova Pro** on AWS Bedrock. Type a concept, get a rendered MP4 — no animation experience needed.
+
+**Built for:** Amazon Nova AI Hackathon 2026 — Multimodal Understanding category
+
+**Stack:** FastAPI · Amazon Bedrock (Nova Pro) · Manim CE v0.19 · AWS EC2 (Ubuntu, us-east-1)
+
+---
+
+## AWS Services
+
+| Service | How it's used |
+| :--- | :--- |
+| **Amazon Bedrock — Nova Pro** | Powers all 6 pipeline layers: topic understanding, storyboarding, code generation, verification, and self-healing auto-fix. Accessed via IAM role — no API keys required. |
+| **EC2** (us-east-1) | Hosts the FastAPI server (port 8000) and runs the Manim renderer. Manim requires Linux (Cairo, Pango, ffmpeg) — EC2 Ubuntu 24.04 provides this cleanly. IAM instance profile grants Bedrock access automatically. |
+| **S3** (mentorbocai-nova-videos) | Configured for video upload and CDN delivery. Planned for next release. |
+| **DynamoDB** | Configured for persistent job history. Planned for next release. |
+
+### Why EC2 and not Lambda?
+Manim render jobs take 60–180 seconds and require persistent filesystem access (writing `.py` files, reading back `.mp4`). Lambda's 15-minute limit and ephemeral `/tmp` are unsuitable. EC2 gives full control over the rendering environment.
+
+### Why Amazon Nova Pro?
+- **Native AWS integration:** IAM role auth — zero credential management, zero key rotation
+- **Best code quality:** Nova Pro's larger context and stronger instruction-following dramatically reduces hallucinated API calls compared to smaller models
+- **Bedrock converse API:** Clean Messages-style interface with structured system prompts and few-shot examples
+- **Hackathon fit:** Multimodal Understanding track — text prompt → visual educational video
+- **Cost-efficient:** ~$0.028 per video (~3 cents). $100 budget ≈ 3,500 videos
+
+---
+
+## Key Features
+- **6-Layer AI Pipeline:** Understanding → Storyboarding → Verification → Code Generation → Refinement → Validation & Auto-Fix
+- **Amazon Nova Pro (Bedrock):** Single IAM-role authenticated client, no key rotation complexity
+- **Zero-LaTeX:** All visuals use `Text()` — crash-proof on any Linux server, no TeX installation needed
+- **18 Validator Auto-Fixes:** Automatically corrects `GREY→GRAY`, `range(float)→np.arange()`, `Create(animate)→animate`, `LaggedStart([list])→LaggedStart(*[list])`, `MathTex→Text`, offscreen positions, invisible stroke widths, and more — before the user sees any error
+- **22 Template Helpers:** Pre-built `ColorfulScene` methods the LLM calls directly (phasor animation, particle physics, energy charts, collision bursts, layout zones)
+- **Golden Few-Shot Examples:** NEET/JEE quality examples for biology, physics, chemistry, and maths (8000-char window for Nova Pro's large context)
+- **Self-Healing:** AST static check → subprocess smoke test → Nova-powered auto-patch before the user sees any error
+- **720p Output:** All renders at `-qm` (1280×720 30fps), 180s timeout
+
+---
+
+## 🏗️ Project Structure
+```
+amazon-nova/
+├── src/
+│   └── app/
+│       ├── api/v1/endpoints.py       # FastAPI endpoints
+│       ├── models/job.py             # Pydantic models
+│       ├── services/
+│       │   ├── bedrock_client.py     # Amazon Bedrock Nova Pro client (IAM auth)
+│       │   ├── pipeline.py           # 6-layer pipeline logic
+│       │   ├── prompts.py            # All prompt templates (L1-L5 + system, 15 rules)
+│       │   ├── few_shot_examples.py  # Golden few-shot examples (NEET quality)
+│       │   ├── validator.py          # AST static analysis + 18 auto-fixes + runtime smoke test
+│       │   └── reviewer.py          # Nova Pro-powered auto-fix for validation errors
+│       ├── core/config.py           # Settings (Nova model ID, AWS region, LLM params)
+│       ├── main.py                  # FastAPI app entry
+│       └── __init__.py
+├── .env.example                     # AWS config template (no API keys)
+├── Dockerfile                       # Production container
+├── README.md
+├── requirements.txt
+├── bedrock_ping_test.py             # Nova Pro connectivity check
+├── scripts/
+│   └── start.sh                     # Server startup
+├── output/
+│   ├── manim/                       # Generated Manim scripts
+│   └── videos/                      # Rendered MP4 files
+└── frontend/                        # Dashboard UI
+```
+
+---
+
+## 🧠 The 6-Layer Pipeline
+| Layer | Stage | Purpose |
+| :--- | :--- | :--- |
+| **1** | **Understanding** | Deconstructs topic into key facts and cinematic script |
+| **2** | **Storyboarding** | Maps script into visual plan (scenes, objects, timings) |
+| **3** | **Verification** | Validates plan against technical and pedagogical constraints |
+| **4** | **Code Generation** | Translates storyboard into Manim Python using few-shot templates + 15 strict rules |
+| **5** | **Refinement** | Enhances visuals with effects and quality improvements |
+| **6** | **Validation & Fix** | 18 auto-fixes → AST static check → runtime smoke test → Nova auto-patch |
+
+---
+
+## ✨ System Architecture
+```
+User Input (Topic, Duration)
+         │
+         ▼
+┌─────────────────┐
+│  Layer 1:       │
+│  Understanding  │──→ understanding.json
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Layer 2:       │
+│  Storyboarding  │──→ plan.json
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Layer 3:       │
+│  Verification   │──→ verified_plan.json
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Layer 4:       │
+│  Code Generation│──→ scene.py (draft)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Layer 5:       │
+│  Refinement     │──→ scene.py (enhanced)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Layer 6:       │
+│  Validation     │──→ scene.py (final, auto-fixed)
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  Manim Render   │──→ video.mp4
+└─────────────────┘
+```
+
+---
+
+## Getting Started
+
+### 1. Prerequisites
+- Python 3.10+
+- Manim Community Edition v0.19+ with ffmpeg and Cairo (**Linux/WSL only** for rendering)
+- AWS account with Bedrock access enabled in `us-east-1`
+- EC2 IAM role with `AmazonBedrockFullAccess` policy attached
+
+### 2. Installation
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configuration
+Copy `.env.example` to `.env`:
+```env
+AWS_REGION=us-east-1
+NOVA_MODEL_ID=amazon.nova-pro-v1:0
+LLM_GENERATOR_MAX_TOKENS=4096
+LLM_GENERATOR_TEMPERATURE=0.01
+PORT=8000
+NODE_ENV=production
+```
+No API keys needed — authentication is handled by the EC2 IAM instance profile.
+
+### 4. Launch (EC2 / Linux)
+```bash
+cd /home/ubuntu/app
+venv/bin/uvicorn src.app.main:app --host 0.0.0.0 --port 8000
+```
+
+### 5. Verify Bedrock connection
+```bash
+python bedrock_ping_test.py
+# Expected: OK Nova Pro responded: Pong. Tokens: in=8 out=3
+```
+
+---
+
+## Generating a Video
+
+```bash
+curl -X POST http://<EC2_IP>:8000/api/generate \
+  -H "Content-Type: application/json" \
+  -d '{"concept":"simple harmonic motion","auto_render":true}'
+```
+
+Poll for completion:
+```bash
+curl http://<EC2_IP>:8000/api/status/<job_id>
+```
+
+---
+
+## Validator Auto-Fixes (Layer 6)
+
+The validator automatically corrects 18+ common LLM code errors before rendering:
+
+| # | Bug | Auto-Fix |
+|---|-----|----------|
+| 1 | Missing `import random` | Injected automatically |
+| 2 | Hallucinated animations (`ZoomIn`, `Bounce`, etc.) | Replaced with real Manim equivalents |
+| 3 | `Scene` inheritance | → `ColorfulScene` |
+| 4 | `MathTex`/`Tex` (no LaTeX on server) | → `Text()` with ASCII formula |
+| 5 | `ImageMobject` (no assets on server) | → placeholder `Circle` |
+| 6 | `font_size > 50` | Clamped to 36 |
+| 7 | Offscreen positions (`UP * 30`, `shift(RIGHT * 15)`) | Clamped to safe bounds |
+| 8 | `Flash(scale_factor=...)` invalid kwarg | Stripped |
+| 9 | `Glow(...)` hallucinated class | Removed |
+| 10 | Unicode subscripts (`²`, `α`) | → ASCII equivalents |
+| 11 | `show_title` > 25 chars | Truncated |
+| 12 | `.next_to(ClassName, ...)` class-as-arg | → `.to_edge(DOWN)` |
+| 13 | `num_sides=N` invalid kwarg | → `n=N` |
+| 14 | `range(0.5, 1.5, 0.1)` float-in-range | → `np.arange(0.5, 1.5, 0.1)` |
+| 15 | `GREY` (not a Manim color) | → `GRAY` |
+| 16 | `Create(obj.animate.method())` | → `obj.animate.method()` |
+| 17 | `LaggedStart([list])` | → `LaggedStart(*[list])` |
+| 18 | `include_numbers=True` (triggers LaTeX) | → `False` |
+
+---
+
+## Troubleshooting
+| Issue | Solution |
+|-------|----------|
+| `NameError` / `ImportError` in render | Validator auto-fixes most issues. Re-run generation. |
+| Video too short | Increase `duration_seconds` in the request body |
+| Text overflow / overlap | Title max 25 chars, captions auto-wrapped |
+| Render fails | Must run on Linux (EC2/WSL). Windows render is not supported. |
+| Bedrock `AccessDeniedException` | Check EC2 IAM role has `AmazonBedrockFullAccess` in us-east-1 |
+| EC2 port 8000 unreachable | Check Security Group inbound rule: TCP 8000, source 0.0.0.0/0 |
+| `ThrottlingException` | Bedrock client retries once with 30s backoff automatically |
+
+---
+
+## Further Reading
+- [UPDATED_ARCHITECTURE.md](UPDATED_ARCHITECTURE.md) — full pipeline and component map
+- [DESIGN.md](DESIGN.md) — hackathon design rationale
+
+---
+
+## License
+MIT
 
 MentorBoxAI converts any topic into a 3Blue1Brown-style educational animation using a 6-layer AI pipeline powered by **Amazon Nova 2 Lite** on AWS Bedrock. Type a concept, get a rendered MP4 — no animation experience needed.
 
