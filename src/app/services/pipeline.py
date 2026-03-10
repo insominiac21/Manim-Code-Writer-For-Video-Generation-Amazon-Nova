@@ -43,12 +43,12 @@ if sys.platform == 'win32':
 
 load_dotenv()
 
-# Amazon Bedrock Nova 2 Lite client
+# Amazon Bedrock Nova Pro client
 from src.app.services.bedrock_client import call_bedrock as call_nova
 
 def call_generator(prompt: str, expect_json: bool = True, system_prompt: str = None) -> str:
     """
-    Call Amazon Nova 2 Lite via Bedrock.
+    Call Amazon Nova Pro via Bedrock.
     Used for: understanding, planning, code generation.
     """
     sys_prompt = system_prompt or (
@@ -58,7 +58,7 @@ def call_generator(prompt: str, expect_json: bool = True, system_prompt: str = N
     max_tokens = int(os.getenv("LLM_GENERATOR_MAX_TOKENS", "8000"))
     temperature = float(os.getenv("LLM_GENERATOR_TEMPERATURE", "0.01"))
     content = call_nova(prompt, system_prompt=sys_prompt, max_tokens=max_tokens, temperature=temperature)
-    print(f"[DEBUG] Nova 2 Lite Response (first 500 chars): {str(content)[:500] if content else 'EMPTY'}")
+    print(f"[DEBUG] Nova Pro Response (first 500 chars): {str(content)[:500] if content else 'EMPTY'}")
     return content
 
 
@@ -266,7 +266,7 @@ def layer4_generate_code(plan: dict, concept: str, goal: str = "") -> str:
         few_shot=few_shot_truncated
     )
 
-    print(f"[Layer 4] Generating with Amazon Nova 2 Lite (few-shot)...")
+    print(f"[Layer 4] Generating with Amazon Nova Pro (few-shot)...")
     result = call_generator(prompt, expect_json=False, system_prompt=CODEGEN_SYSTEM_PROMPT)
 
     # Extract code from markdown if present

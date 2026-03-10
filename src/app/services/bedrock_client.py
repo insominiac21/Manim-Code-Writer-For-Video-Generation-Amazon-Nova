@@ -11,7 +11,7 @@ import boto3
 from botocore.exceptions import ClientError, ReadTimeoutError, EndpointResolutionError
 from typing import Optional
 
-NOVA_MODEL_ID = "amazon.nova-lite-v1:0"
+NOVA_MODEL_ID = "amazon.nova-pro-v1:0"
 NOVA_REGION = "us-east-1"
 
 # Lazy-initialised client — reused across calls to avoid repeated auth overhead.
@@ -66,7 +66,7 @@ def call_bedrock(
             # Log token usage for monitoring
             usage = response.get("usage", {})
             print(
-                f"[Bedrock] Nova Lite | in={usage.get('inputTokens', '?')} "
+                f"[Bedrock] Nova Pro | in={usage.get('inputTokens', '?')} "
                 f"out={usage.get('outputTokens', '?')} tokens"
             )
 
