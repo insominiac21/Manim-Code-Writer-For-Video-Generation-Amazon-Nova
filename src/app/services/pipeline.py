@@ -620,8 +620,8 @@ def _set_render_memory_limit():
         pass  # non-Linux or permission denied — silently ignore
 
 
-def _try_render_direct(job_id: str, manim_file: Path) -> Optional[str]:
-    """Try rendering using direct manim command."""
+def _try_render_direct(job_id: str, manim_file: Path) -> tuple:
+    """Try rendering using direct manim command. Returns (url_or_none, stderr)."""
     try:
         services_dir = str(Path(__file__).resolve().parent)
         env = os.environ.copy()
@@ -635,22 +635,22 @@ def _try_render_direct(job_id: str, manim_file: Path) -> Optional[str]:
             env=env, preexec_fn=_set_render_memory_limit
         )
         if result.returncode == 0:
-            return _find_and_copy_video(job_id)
+            return _find_and_copy_video(job_id), ""
         print(f"[Render-Direct] Failed (rc={result.returncode}): {result.stderr[-2000:]}")
-        return None
+        return None, result.stderr
     except FileNotFoundError:
         print("[Render-Direct] manim not in PATH")
-        return None
+        return None, "manim binary not found"
     except subprocess.TimeoutExpired:
         print("[Render-Direct] Timeout")
-        return None
+        return None, "render timeout"
     except Exception as e:
         print(f"[Render-Direct] Error: {e}")
-        return None
+        return None, str(e)
 
 
-def _try_render_python_module(job_id: str, manim_file: Path) -> Optional[str]:
-    """Try rendering using python -m manim (uses same venv as server)."""
+def _try_render_python_module(job_id: str, manim_file: Path) -> tuple:
+    """Try rendering using python -m manim. Returns (url_or_none, stderr)."""
     try:
         services_dir = str(Path(__file__).resolve().parent)
         env = os.environ.copy()
@@ -664,12 +664,12 @@ def _try_render_python_module(job_id: str, manim_file: Path) -> Optional[str]:
             env=env, preexec_fn=_set_render_memory_limit
         )
         if result.returncode == 0:
-            return _find_and_copy_video(job_id)
+            return _find_and_copy_video(job_id), ""
         print(f"[Render-Python] Failed (rc={result.returncode}): {result.stderr[-2000:]}")
-        return None
+        return None, result.stderr
     except Exception as e:
         print(f"[Render-Python] Error: {e}")
-        return None
+        return None, str(e)
 
 
 def _try_render_docker(job_id: str, manim_file: Path) -> Optional[str]:
@@ -701,30 +701,159 @@ def _try_render_docker(job_id: str, manim_file: Path) -> Optional[str]:
         return None
 
 
-def render_video(job_id: str, manim_file: Path) -> Optional[str]:
+def _extract_render_error(stderr: str) -> str:
     """
-    Render Manim code to video.
-    Uses a global lock so concurrent jobs queue rather than compete for CPU.
-    Tries multiple methods: direct manim, python -m manim, docker.
+    Parse Manim's rich-traceback stderr into a concise error with line info.
+    Handles both Manim's rich panel format and plain Python tracebacks.
     """
+    if not stderr:
+        return ""
+
+    # Find the error type line (last occurrence)
+    error_line = ""
+    for line in reversed(stderr.splitlines()):
+        stripped = line.strip()
+        if re.match(r'^(TypeError|ValueError|AttributeError|NameError|RuntimeError|IndexError|KeyError|SyntaxError|Exception)[\s:]', stripped):
+            error_line = stripped
+            break
+
+    # Find line number from Manim rich traceback (contains box-drawing chars)
+    lineno = ""
+    m = re.search(r'[\u2502\u2503]\s*\u2757\s*(\d+)\s*[\u2502\u2503]', stderr)
+    if m:
+        lineno = m.group(1)
+    # Also try plain Python traceback
+    if not lineno:
+        m = re.search(r'File "[^"]+", line (\d+)', stderr)
+        if m:
+            lineno = m.group(1)
+
+    if not error_line:
+        for line in reversed(stderr.splitlines()):
+            stripped = line.strip()
+            if stripped and not stripped.startswith(('INFO', 'WARNING', '|', '+', '-')):
+                error_line = stripped
+                break
+
+    prefix = f"Line {lineno}: " if lineno else ""
+    return f"{prefix}{error_line}" if error_line else stderr[-400:]
+
+
+def _strip_failing_element(code: str, stderr: str) -> str:
+    """
+    Surgically replace the crashing line with self.wait(0.5).
+    Falls back to removing the last self.play() if line number is not found.
+    """
+    lines = code.splitlines()
+
+    lineno = None
+    m = re.search(r'[\u2502\u2503]\s*\u2757\s*(\d+)\s*[\u2502\u2503]', stderr)
+    if m:
+        lineno = int(m.group(1))
+    if not lineno:
+        m = re.search(r'File "[^"]+", line (\d+)', stderr)
+        if m:
+            lineno = int(m.group(1))
+
+    if lineno and 1 <= lineno <= len(lines):
+        bad_line = lines[lineno - 1]
+        indent = len(bad_line) - len(bad_line.lstrip())
+        lines[lineno - 1] = ' ' * indent + 'self.wait(0.5)  # stripped: render error'
+        print(f"[Render] Stripped line {lineno}: {bad_line.strip()[:80]}")
+    else:
+        # Remove last self.play() as best guess
+        for i in range(len(lines) - 1, -1, -1):
+            if 'self.play(' in lines[i]:
+                indent = len(lines[i]) - len(lines[i].lstrip())
+                lines[i] = ' ' * indent + 'self.wait(0.5)  # stripped: render error'
+                print(f"[Render] Stripped last self.play() at line {i + 1}")
+                break
+
+    return '\n'.join(lines)
+
+
+def render_video(job_id: str, manim_file: Path, concept: str = "", plan: Optional[dict] = None) -> Optional[str]:
+    """
+    Self-healing render pipeline. Delay is acceptable — failure is not.
+
+    Flow per attempt:
+      1. Try render (direct manim binary, then python -m manim)
+      2. On failure: extract exact error + line from Manim stderr
+      3. Apply auto_fix_common_issues (rule-based) + LLM reviewer (error-specific)
+      4. Write fixed file, retry — up to MAX_FIX_ATTEMPTS LLM rounds
+      5. Final pass: strip the crashing line surgically, try one last render
+      6. Return None only if stripped version also fails
+    """
+    MAX_FIX_ATTEMPTS = 3
+
     print(f"[Render] Waiting for render slot: {job_id}...")
     with _RENDER_LOCK:
         print(f"[Render] Starting render for {job_id}...")
 
-        video_url = _try_render_direct(job_id, manim_file)
-        if video_url:
-            return video_url
+        current_file = manim_file
+        last_stderr = ""
 
-        video_url = _try_render_python_module(job_id, manim_file)
-        if video_url:
-            return video_url
+        for attempt in range(MAX_FIX_ATTEMPTS + 1):
+            url, stderr = _try_render_direct(job_id, current_file)
+            if url:
+                return url
+            last_stderr = stderr or ""
 
-        video_url = _try_render_docker(job_id, manim_file)
-        if video_url:
-            return video_url
+            url, stderr = _try_render_python_module(job_id, current_file)
+            if url:
+                return url
+            last_stderr = last_stderr or stderr or ""
 
-        print("[Render] All render methods failed. Video not generated.")
+            if attempt == MAX_FIX_ATTEMPTS:
+                break
+
+            error_summary = _extract_render_error(last_stderr)
+            if not error_summary:
+                print("[Render] Cannot parse error from stderr — stopping fix loop")
+                break
+
+            print(f"[Render] Fix attempt {attempt + 1}/{MAX_FIX_ATTEMPTS}: {error_summary[:150]}")
+
+            try:
+                from src.app.services.validator import auto_fix_common_issues
+                from src.app.services.reviewer import review_and_fix
+
+                code = current_file.read_text(encoding="utf-8")
+                code = auto_fix_common_issues(code)          # rule-based fast fixes
+                fixed_code = review_and_fix(code, error_summary)  # LLM targeted fix
+                if not fixed_code:
+                    print("[Render] LLM returned no fix — stripping failing element")
+                    fixed_code = _strip_failing_element(code, last_stderr)
+            except Exception as fix_err:
+                print(f"[Render] Fix error: {fix_err}")
+                break
+
+            fix_file = manim_file.parent / f"{job_id}_fix{attempt + 1}.py"
+            fix_file.write_text(fixed_code, encoding="utf-8")
+            current_file = fix_file
+
+        # Final pass: strip the crashing line and try once more
+        print("[Render] LLM rounds exhausted — stripping failing element for final attempt")
+        try:
+            code = current_file.read_text(encoding="utf-8")
+            stripped_code = _strip_failing_element(code, last_stderr)
+            strip_file = manim_file.parent / f"{job_id}_stripped.py"
+            strip_file.write_text(stripped_code, encoding="utf-8")
+
+            url, _ = _try_render_direct(job_id, strip_file)
+            if url:
+                print("[Render] Stripped version rendered successfully")
+                return url
+            url, _ = _try_render_python_module(job_id, strip_file)
+            if url:
+                print("[Render] Stripped version rendered successfully")
+                return url
+        except Exception as strip_err:
+            print(f"[Render] Strip attempt error: {strip_err}")
+
+        print("[Render] All render attempts failed.")
         return None
+
 
 def _format_code(code: str) -> str:
     """Apply code formatting (optional, if black is available).

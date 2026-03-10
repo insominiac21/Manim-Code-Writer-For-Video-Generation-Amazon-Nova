@@ -831,6 +831,9 @@ CRITICAL RULES - VIOLATION MEANS FAILURE:
 14. stroke_width minimum is 1.5 for visible lines. stroke_width=0.1 is invisible.
 15. Use only standard Manim color names: WHITE, BLACK, RED, BLUE, GREEN, YELLOW,
     ORANGE, PURPLE, PINK, TEAL, GOLD, GRAY — or Colors.X from the template class.
+16. NEVER pass run_time= inside .animate.METHOD(). run_time belongs in self.play() only:
+    WRONG: self.play(obj.animate.move_to(RIGHT*0.5, run_time=1))
+    RIGHT: self.play(obj.animate.move_to(RIGHT*0.5), run_time=1)
 
 ═══════════════════════════════════════════════════════════════════════════════
 CINEMATIC MANDATE — YOU MUST USE THESE TECHNIQUES (not just circles + labels):

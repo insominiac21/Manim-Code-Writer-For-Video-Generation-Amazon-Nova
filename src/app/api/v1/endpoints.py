@@ -74,13 +74,17 @@ def create_job(request: GenerateRequest):
 			"understanding": result["understanding"]
 		})
 
-		# Auto-render if enabled
+		# Auto-render if enabled — delay is acceptable, failure is not
 		video_url = None
 		if request.auto_render:
 			try:
 				from src.app.services.pipeline import render_video
 				jobs[job_id]["current_step"] = "rendering"
-				video_url = render_video(job_id, manim_file)
+				video_url = render_video(
+					job_id, manim_file,
+					concept=request.concept,
+					plan=result.get("plan")
+				)
 			except Exception as render_err:
 				print(f"[Render] Error: {render_err}")
 				video_url = None

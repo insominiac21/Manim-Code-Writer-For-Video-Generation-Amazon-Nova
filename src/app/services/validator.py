@@ -322,6 +322,19 @@ def auto_fix_common_issues(source: str) -> str:
     if fixed.count('LaggedStart(*[') > count_before - fixed.count('LaggedStart(['):
         fixes_applied.append(f"Fixed LaggedStart([...]) -> LaggedStart(*[...])")
 
+    # 19. Fix run_time= inside .animate.METHOD() chains.
+    # run_time is an argument to self.play(), NOT to the .animate sub-method.
+    # e.g. obj.animate.move_to(dest, run_time=1) → obj.animate.move_to(dest)
+    # The correct form is: self.play(obj.animate.move_to(dest), run_time=1)
+    def _strip_runtime_from_animate(m):
+        full = m.group(0)
+        fixes_applied.append("Fixed run_time= inside .animate chain -> belongs in self.play()")
+        return full
+    # run_time as last arg: .animate.METHOD(x, run_time=N)
+    fixed = re.sub(r'(\.animate\.\w+\([^)]*?),\s*run_time\s*=\s*[\d.]+\s*(\))', r'\1\2', fixed)
+    # run_time as only/first arg: .animate.METHOD(run_time=N) or .animate.METHOD(run_time=N, x)
+    fixed = re.sub(r'(\.animate\.\w+\()\s*run_time\s*=\s*[\d.]+\s*,?\s*', r'\1', fixed)
+
     if fixes_applied:
         print(f"[Validator] Auto-fixed {len(fixes_applied)} issues: {', '.join(fixes_applied)}")
     
