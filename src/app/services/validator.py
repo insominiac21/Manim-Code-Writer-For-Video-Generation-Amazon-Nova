@@ -140,7 +140,11 @@ def auto_fix_common_issues(source: str) -> str:
     fixed = re.sub(r'\.shift\(DOWN\s*\*\s*([4-9]|[1-9]\d)\)', '.shift(DOWN * 2.5)', fixed)
     fixed = re.sub(r'\.shift\(LEFT\s*\*\s*([7-9]|[1-9]\d)\)', '.shift(LEFT * 5)', fixed)
     fixed = re.sub(r'\.shift\(RIGHT\s*\*\s*([7-9]|[1-9]\d)\)', '.shift(RIGHT * 5)', fixed)
-    
+    # 7b. Clamp decimal off-screen positions (e.g. UP * 30.1, DOWN * 9.5)
+    fixed = re.sub(r'\.shift\(UP\s*\*\s*(\d+\.\d+)', lambda m: '.shift(UP * 2.5' if float(m.group(1)) > 3.5 else m.group(0), fixed)
+    fixed = re.sub(r'\.shift\(DOWN\s*\*\s*(\d+\.\d+)', lambda m: '.shift(DOWN * 2.5' if float(m.group(1)) > 3.5 else m.group(0), fixed)
+    fixed = re.sub(r'move_to\(UP\s*\*\s*(\d+\.\d+)', lambda m: 'move_to(UP * 3' if float(m.group(1)) > 3.5 else m.group(0), fixed)
+    fixed = re.sub(r'move_to\(DOWN\s*\*\s*(\d+\.\d+)', lambda m: 'move_to(DOWN * 2.5' if float(m.group(1)) > 3.5 else m.group(0), fixed)    
     # 8. Reduce scale factors that are dangerously large (>= 4.0 only)
     # Allow 2.0-3.9 for legitimate particle/zoom effects; only cap 4.0+ and integer multiples
     fixed = re.sub(r'\.scale\(([4-9]\.\d|[1-9]\d)\)', '.scale(2.5)', fixed)
@@ -254,6 +258,15 @@ def auto_fix_common_issues(source: str) -> str:
     fixed = re.sub(r'move_to\(RIGHT\s*\*\s*([7-9]|[1-9]\d)\)', 'move_to(RIGHT * 5)', fixed)
     fixed = re.sub(r'move_to\(UP\s*\*\s*([4-9]|[1-9]\d)\)', 'move_to(UP * 3)', fixed)
     fixed = re.sub(r'move_to\(DOWN\s*\*\s*([4-9]|[1-9]\d)\)', 'move_to(DOWN * 2.5)', fixed)
+
+    # 13b. Fix .next_to(ClassName, ...) where a class is passed instead of an instance.
+    # e.g. .next_to(Circle, DOWN) — Circle is a class, not a Mobject.
+    # Replace with .to_edge(DOWN) as a safe fallback.
+    _manim_classes = r'\b(Circle|Square|Rectangle|Triangle|Polygon|Text|Arrow|Line|Dot|Star|Ellipse|Arc|Sector|VGroup|Group|Scene)\b'
+    def _fix_next_to_class(m):
+        fixes_applied.append(f"Fixed next_to({m.group(1)}, ...) class-as-arg -> to_edge(DOWN)")
+        return '.to_edge(DOWN)  # auto-fixed: was next_to(' + m.group(1) + ', ...)'
+    fixed = re.sub(r'\.next_to\(' + _manim_classes + r'\s*,', _fix_next_to_class, fixed)
     
     # 13. (Removed) The blanket LEFT/RIGHT→DOWN override was incorrectly breaking
     # split-screen layouts where left_panel.next_to(right_panel, RIGHT) is intentional.
@@ -434,6 +447,9 @@ if 'manim_templates' not in sys.modules:
         GRAY = "#808080"; LT_GRAY = "#CCCCCC"; TEAL = "#008080"
         LIGHT = "#FFD700"; ENERGY = "#FF8C00"; MOLECULE = "#39FF14"
         ELECTRON = "#00FFFF"; TEXT = "#FFFFFF"; IMPORTANT = "#FFD700"
+        BROWN = "#8B4513"; DARK_BLUE = "#00008B"; LIGHT_BLUE = "#ADD8E6"
+        MAROON = "#800000"; DARK_GREEN = "#006400"; LIGHT_GREEN = "#90EE90"
+        SILVER = "#C0C0C0"; DARK_GRAY = "#404040"
     _mock_mt.Colors = Colors
     _mock_mt.phasor_to_sine_animation = lambda *a, **kw: None
     _mock_mt.static_sine_wave = lambda *a, **kw: None

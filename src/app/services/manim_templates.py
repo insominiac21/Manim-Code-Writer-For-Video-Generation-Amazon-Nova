@@ -117,6 +117,15 @@ class Colors:
     GRAY = "#808080"
     BLACK = "#000000"
     LT_GRAY = "#CCCCCC"
+    # Additional common color aliases to guard against LLM hallucinations
+    BROWN = "#8B4513"
+    DARK_BLUE = "#00008B"
+    LIGHT_BLUE = "#ADD8E6"
+    MAROON = "#800000"
+    DARK_GREEN = "#006400"
+    LIGHT_GREEN = "#90EE90"
+    SILVER = "#C0C0C0"
+    DARK_GRAY = "#404040"
 
 # Global Color Aliases (Safe-guard against NameError)
 CYAN = Colors.CYAN
@@ -136,6 +145,14 @@ PINK = Colors.PINK
 GRAY = Colors.GRAY
 BLACK = Colors.BLACK
 LT_GRAY = Colors.LT_GRAY
+BROWN = Colors.BROWN
+DARK_BLUE = Colors.DARK_BLUE
+LIGHT_BLUE = Colors.LIGHT_BLUE
+MAROON = Colors.MAROON
+DARK_GREEN = Colors.DARK_GREEN
+LIGHT_GREEN = Colors.LIGHT_GREEN
+SILVER = Colors.SILVER
+DARK_GRAY = Colors.DARK_GRAY
 
 # ==========================================
 # MASTER TEMPLATE SCENE
@@ -920,6 +937,14 @@ except Exception as _e:
         GRAY = "#808080"
         BLACK = "#000000"
         LT_GRAY = "#CCCCCC"
+        BROWN = "#8B4513"
+        DARK_BLUE = "#00008B"
+        LIGHT_BLUE = "#ADD8E6"
+        MAROON = "#800000"
+        DARK_GREEN = "#006400"
+        LIGHT_GREEN = "#90EE90"
+        SILVER = "#C0C0C0"
+        DARK_GRAY = "#404040"
 
     class ColorfulScene:  # type: ignore
         pass
