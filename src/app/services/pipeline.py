@@ -742,28 +742,51 @@ def _extract_render_error(stderr: str) -> str:
 def _strip_failing_element(code: str, stderr: str) -> str:
     """
     Surgically replace the crashing line with self.wait(0.5).
-    Falls back to removing the last self.play() if line number is not found.
+    Rules:
+    - NEVER touch structural lines (class/def/import/from) or already-stripped lines.
+    - For IndentationError/SyntaxError, line-based stripping makes things worse —
+      skip straight to removing the last self.play() call instead.
+    - After stripping, verify syntax with compile(); if still broken, remove last play().
     """
     lines = code.splitlines()
 
+    # For syntax/indentation errors, line stripping just propagates damage.
+    is_syntax_err = bool(re.search(r'(IndentationError|SyntaxError)', stderr))
+
+    # Structural prefixes we must never replace
+    STRUCTURAL = ('class ', 'def ', 'import ', 'from ', 'self.wait(')
+
     lineno = None
-    m = re.search(r'[\u2502\u2503]\s*\u2757\s*(\d+)\s*[\u2502\u2503]', stderr)
-    if m:
-        lineno = int(m.group(1))
-    if not lineno:
-        m = re.search(r'File "[^"]+", line (\d+)', stderr)
+    if not is_syntax_err:
+        m = re.search(r'[\u2502\u2503]\s*\u2757\s*(\d+)\s*[\u2502\u2503]', stderr)
         if m:
             lineno = int(m.group(1))
+        if not lineno:
+            m = re.search(r'File "[^"]+", line (\d+)', stderr)
+            if m:
+                lineno = int(m.group(1))
 
+    stripped = False
     if lineno and 1 <= lineno <= len(lines):
-        bad_line = lines[lineno - 1]
-        indent = len(bad_line) - len(bad_line.lstrip())
-        lines[lineno - 1] = ' ' * indent + 'self.wait(0.5)  # stripped: render error'
-        print(f"[Render] Stripped line {lineno}: {bad_line.strip()[:80]}")
-    else:
-        # Remove last self.play() as best guess
+        raw = lines[lineno - 1].strip()
+        if raw and not any(raw.startswith(kw) for kw in STRUCTURAL):
+            indent = len(lines[lineno - 1]) - len(lines[lineno - 1].lstrip())
+            lines[lineno - 1] = ' ' * indent + 'self.wait(0.5)  # stripped: render error'
+            print(f"[Render] Stripped line {lineno}: {raw[:80]}")
+            stripped = True
+
+    # Verify syntax; if still broken or we didn't strip above, remove last self.play()
+    candidate = '\n'.join(lines)
+    syntax_ok = True
+    try:
+        compile(candidate, '<string>', 'exec')
+    except SyntaxError:
+        syntax_ok = False
+
+    if not stripped or not syntax_ok:
+        # Walk backwards and remove the last self.play() that isn't already stripped
         for i in range(len(lines) - 1, -1, -1):
-            if 'self.play(' in lines[i]:
+            if 'self.play(' in lines[i] and 'stripped' not in lines[i]:
                 indent = len(lines[i]) - len(lines[i].lstrip())
                 lines[i] = ' ' * indent + 'self.wait(0.5)  # stripped: render error'
                 print(f"[Render] Stripped last self.play() at line {i + 1}")
